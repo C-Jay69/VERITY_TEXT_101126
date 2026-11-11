@@ -128,25 +128,31 @@ export function buildFrequentWordSet(words: string[]): Set<string> {
 }
 
 /**
- * Use compromise to classify a sentence as simple/compound/complex/compound-complex.
- * Heuristic based on clauses and conjunctions.
+ * Classify a sentence as simple/compound/complex/compound-complex.
+ *
+ * This is a deliberately lightweight regex heuristic rather than a full
+ * syntactic parse: it runs once per sentence, and a novel contains tens of
+ * thousands of sentences. The classification logic only depends on the
+ * presence of a subordinating conjunction and a comma + coordinating
+ * conjunction, so invoking compromise per sentence adds cost without changing
+ * the result.
  */
 export function classifySentence(sentence: string): {
   type: "simple" | "compound" | "complex" | "compound-complex" | "fragment";
   clauses: number;
 } {
-  const doc = nlp(sentence);
-  const clauses = doc.clauses().length;
   const hasCommaConjunction = /,\s*(and|but|or|so|yet|for|nor)\s/i.test(
     sentence,
   );
-  const hasSubordinating =
-    /\b(because|although|though|since|unless|while|whereas|if|whether|after|before|when|whenever|where|wherever|as|until|once|provided)\b/i.test(
-      sentence,
-    );
-  if (clauses <= 1 && !hasSubordinating && !hasCommaConjunction) {
-    return { type: "simple", clauses: 1 };
-  }
+  const subordinatingMatches = sentence.match(
+    /\b(because|although|though|since|unless|while|whereas|if|whether|after|before|when|whenever|where|wherever|as|until|once|provided)\b/gi,
+  );
+  const subordinatingCount = subordinatingMatches?.length ?? 0;
+  const hasSubordinating = subordinatingCount > 0;
+  const clauses = Math.max(
+    1,
+    subordinatingCount + (hasCommaConjunction ? 1 : 0) + 1,
+  );
   if (hasSubordinating && hasCommaConjunction) {
     return { type: "compound-complex", clauses: Math.max(clauses, 2) };
   }

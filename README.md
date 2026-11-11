@@ -152,15 +152,16 @@ negative, intensifier, and hedging word lists.
 ## Upload constraints
 
 - **Accepted formats:** `.docx`, `.pdf`, `.txt`
-- **Max size:** 5 MB (5,242,880 bytes) — enforced at the edge (frontend + backend)
+- **Max size:** 15 MB (15,728,640 bytes) — enforced at the edge (frontend + backend)
 - **Validation:** extension + declared MIME type + magic bytes
   - PDF: `%PDF`
   - DOCX: ZIP (`PK\x03\x04`)
   - TXT: printable ASCII / valid UTF-8
 - **Minimum text:** ≥ 50 words after extraction (else: "Not enough text to
   analyze reliably.")
-- **Maximum analysis:** first 50,000 characters (longer text is flagged
-  "partial analysis")
+- **Maximum analysis:** 1,000,000 characters — roughly 150,000–170,000 English
+  words, enough for a full novel. Text beyond that is flagged "partial
+  analysis" and the first 1,000,000 characters are analyzed.
 - **Sanitization:** strip nulls, NFC-normalize, collapse excessive whitespace
   while preserving paragraph breaks.
 
@@ -291,6 +292,9 @@ README.md
   misses many entities, especially informal ones.
 - **Sample-length sensitivity.** Samples < 200 words are labeled
   "low-confidence"; samples < 50 words are rejected.
+- **Detection is full-document; humanization is not.** Detection analyzes up to
+  1,000,000 characters. The humanizer sends at most 50,000 characters per pass
+  to the language model, so long documents are only partially rewritten.
 - **Session TTL.** In-memory sessions expire after 1 hour; refresh the page
   after that and you'll need to re-upload.
 - **Single-process state.** The session store is in-process memory; if the dev
@@ -311,3 +315,7 @@ parsing via `mammoth` (DOCX), `pdf-parse` (PDF), and `Buffer.toString('utf8')`
 (TXT). PDF report generation via `pdfkit`. DOCX regeneration via the `docx`
 package. Language-model humanization via any OpenAI-compatible provider
 (OpenRouter, OpenAI, or a custom endpoint) or `z-ai-web-dev-sdk`.
+
+Landing-page photography is from Pexels and Pixabay and is bundled locally in
+`public/images/`; see [IMAGE_CREDITS.md](IMAGE_CREDITS.md) for the individual
+photographers and licences. The app does not call either service at runtime.

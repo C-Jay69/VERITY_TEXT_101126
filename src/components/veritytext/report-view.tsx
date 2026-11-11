@@ -29,6 +29,14 @@ const BAND_STYLES: Record<BandKey, { bg: string; text: string; ring: string; lab
   "very-likely-ai": { bg: "bg-rose-50", text: "text-rose-700", ring: "ring-rose-200", label: "Very Likely AI" },
 };
 
+const BAND_ACCENTS: Record<BandKey, string> = {
+  human: "#10b981",
+  "likely-human": "#10b981",
+  mixed: "#d97706",
+  "likely-ai": "#e11d48",
+  "very-likely-ai": "#e11d48",
+};
+
 export function ReportView() {
   const report = useVerityStore((s) => s.report);
   const meta = useVerityStore((s) => s.meta);
@@ -136,20 +144,15 @@ export function ReportView() {
       {/* Verdict header */}
       <Card className={cn("border-stone-200 ring-1", style.ring, style.bg)}>
         <CardHeader>
-          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-            <div>
+          <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
+            <div className="min-w-0">
               <div className="text-xs font-medium uppercase tracking-wide text-stone-500">
                 Aggregate verdict
               </div>
               <div className={cn("mt-1 font-serif text-3xl font-semibold sm:text-4xl", style.text)}>
                 {verdict!.verdict}
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-stone-700">
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="font-semibold tabular-nums">{verdict!.aiProbability}%</span>
-                  <span className="text-stone-500">AI probability</span>
-                </span>
-                <span aria-hidden="true" className="text-stone-300">•</span>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-stone-700">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="font-semibold tabular-nums">{verdict!.confidence}%</span>
                   <span className="text-stone-500">confidence</span>
@@ -166,38 +169,65 @@ export function ReportView() {
                 )}
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => download("pdf")}
-                disabled={downloading === "pdf-original"}
-              >
-                {downloading === "pdf-original" ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <FileText className="size-4" />
-                )}
-                PDF report
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => download("json")}
-                disabled={downloading === "json-original"}
-              >
-                {downloading === "json-original" ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <FileJson className="size-4" />
-                )}
-                JSON report
-              </Button>
-              <Button size="sm" onClick={() => setView("humanize")}>
-                <Sparkles className="size-4" />
-                Proceed to Humanize
-              </Button>
+
+            <div
+              className="relative size-36 shrink-0 self-center rounded-full shadow-inner sm:self-auto"
+              style={{
+                background: `conic-gradient(${BAND_ACCENTS[band]} ${
+                  verdict!.aiProbability * 3.6
+                }deg, rgba(120, 113, 108, 0.16) 0deg)`,
+              }}
+              role="img"
+              aria-label={`${verdict!.aiProbability} percent AI probability`}
+            >
+              <div className="absolute inset-[9px] flex flex-col items-center justify-center rounded-full bg-white/95">
+                <span
+                  className={cn(
+                    "font-serif text-4xl font-semibold leading-none tracking-tight tabular-nums",
+                    style.text,
+                  )}
+                >
+                  {verdict!.aiProbability}
+                  <span className="text-xl">%</span>
+                </span>
+                <span className="mt-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+                  AI probability
+                </span>
+              </div>
             </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2 border-t border-stone-200/80 pt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => download("pdf")}
+              disabled={downloading === "pdf-original"}
+            >
+              {downloading === "pdf-original" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <FileText className="size-4" />
+              )}
+              PDF report
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => download("json")}
+              disabled={downloading === "json-original"}
+            >
+              {downloading === "json-original" ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <FileJson className="size-4" />
+              )}
+              JSON report
+            </Button>
+            <Button size="sm" onClick={() => setView("humanize")}>
+              <Sparkles className="size-4" />
+              Proceed to Humanize
+            </Button>
           </div>
         </CardHeader>
         <CardContent>

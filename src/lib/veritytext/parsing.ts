@@ -7,6 +7,7 @@ import { Buffer } from "node:buffer";
 import path from "node:path";
 import { existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
+import { MAX_ANALYZED_CHARS } from "./detector";
 
 // pdf-parse uses pdfjs-dist under the hood, which dynamically imports a
 // worker module via `GlobalWorkerOptions.workerSrc`. Point it at the on-disk
@@ -31,7 +32,7 @@ function ensurePdfWorker() {
   }
 }
 
-export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5,242,880 bytes
+export const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15,728,640 bytes
 export const ACCEPTED_EXTENSIONS = [".docx", ".pdf", ".txt"] as const;
 export type AcceptedExt = (typeof ACCEPTED_EXTENSIONS)[number];
 
@@ -73,7 +74,7 @@ export function validateFile(
   if (size > MAX_FILE_SIZE) {
     return {
       ok: false,
-      error: `File is ${(size / 1024 / 1024).toFixed(2)} MB. Maximum is 5.00 MB (5,242,880 bytes).`,
+      error: `File is ${(size / 1024 / 1024).toFixed(2)} MB. Maximum is 15.00 MB (15,728,640 bytes).`,
     };
   }
   const lower = filename.toLowerCase();
@@ -230,7 +231,7 @@ export async function extractText(
     );
   }
 
-  const partialAnalysis = sanitized.length > 50_000;
+  const partialAnalysis = sanitized.length > MAX_ANALYZED_CHARS;
   return {
     text: sanitized,
     meta: {

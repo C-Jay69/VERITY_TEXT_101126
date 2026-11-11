@@ -14,23 +14,35 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000",
+  ),
   title: "VerityText — AI Text Detector & Humanizer",
   description: "Upload a document and get a seven-signal AI-text detection analysis with an aggregate verdict, evidence snippets, and a downloadable report. Optionally humanize the text to reduce detected signals.",
   keywords: ["AI text detector", "AI humanizer", "VerityText", "burstiness", "perplexity", "AI content detection"],
   authors: [{ name: "VerityText" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.svg",
   },
   openGraph: {
     title: "VerityText — AI Text Detector & Humanizer",
     description: "Seven-signal AI-text detection with an aggregate verdict, evidence, and an optional humanizer.",
     siteName: "VerityText",
     type: "website",
+    images: [
+      {
+        url: "/images/hero-library.webp",
+        width: 2200,
+        height: 1200,
+        alt: "Library shelves lined with books",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "VerityText — AI Text Detector & Humanizer",
     description: "Seven-signal AI-text detection with an aggregate verdict, evidence, and an optional humanizer.",
+    images: ["/images/hero-library.webp"],
   },
 };
 

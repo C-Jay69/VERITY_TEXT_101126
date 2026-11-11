@@ -25,7 +25,9 @@ import { specificitySignal } from "./signals/specificity";
 import { toneSignal } from "./signals/tone";
 import { fingerprintsSignal } from "./signals/fingerprints";
 
-const MAX_ANALYZED_CHARS = 50_000;
+// 1,000,000 characters is roughly 150,000–170,000 English words — enough to
+// analyze a full novel in one pass. Longer uploads are flagged as partial.
+export const MAX_ANALYZED_CHARS = 1_000_000;
 
 export interface AnalyzeOptions {
   /** Original extracted length before truncation. */
@@ -77,7 +79,7 @@ export function analyzeText(
   }
   if (partialAnalysis) {
     warnings.push(
-      `Text was truncated at ${MAX_ANALYZED_CHARS} characters (original ${options.extractedLength}). Analysis covers the first portion only.`,
+      `Text was truncated at ${MAX_ANALYZED_CHARS.toLocaleString()} characters (original ${options.extractedLength.toLocaleString()}). Analysis covers the first portion only.`,
     );
   }
   if (lowConfidence) {

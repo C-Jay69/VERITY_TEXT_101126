@@ -45,7 +45,7 @@ export interface AggregateResult {
   singleSignalTrigger: boolean;
   /** True if the text was very short (50–200 words). */
   lowConfidence: boolean;
-  /** True if the text was truncated at 50,000 chars. */
+  /** True if the text was truncated at MAX_ANALYZED_CHARS. */
   partialAnalysis: boolean;
   /** Notes (e.g. "single-signal trigger — low confidence"). */
   notes: string[];

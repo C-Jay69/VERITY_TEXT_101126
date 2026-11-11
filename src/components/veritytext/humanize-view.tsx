@@ -305,6 +305,18 @@ export function HumanizeView() {
           names, dates, numbers, and quotes. The output is re-scored automatically so you can see the
           improvement.
         </p>
+        {meta && meta.extractedLength > 50_000 && (
+          <Alert className="mt-4 border-amber-200 bg-amber-50">
+            <AlertTriangle className="size-4 text-amber-600" />
+            <AlertTitle className="text-amber-900">Long document</AlertTitle>
+            <AlertDescription className="text-amber-800">
+              Detection and reports cover the whole document. The humanizer
+              rewrites up to 50,000 characters per pass to stay within the
+              language model&apos;s limits, so only that portion will be
+              rewritten.
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

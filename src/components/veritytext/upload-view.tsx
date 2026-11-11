@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { useVerityStore, type SessionMeta } from "@/lib/veritytext/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,8 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  ArrowDown,
+  BookOpen,
   FileText,
   UploadCloud,
   X,
@@ -18,6 +21,7 @@ import {
   FolderOpen,
   Trash2,
   RefreshCw,
+  ShieldCheck,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -25,7 +29,13 @@ import type { DetectionReport } from "@/lib/veritytext/detector/types";
 
 const ACCEPTED = [".docx", ".pdf", ".txt"];
 const ACCEPTED_MIME = ".docx,.pdf,.txt";
-const MAX_SIZE = 5 * 1024 * 1024;
+const MAX_SIZE = 15 * 1024 * 1024;
+
+const HERO_STATS = [
+  { value: "7", label: "independent signals" },
+  { value: "244", label: "AI-favourite terms" },
+  { value: "1 hr", label: "in-memory lifetime" },
+] as const;
 
 interface UploadResponse {
   sessionId: string;
@@ -95,6 +105,7 @@ export function UploadView() {
   const error = useVerityStore((s) => s.error);
   const recents = useVerityStore((s) => s.recents);
   const setView = useVerityStore((s) => s.setView);
+  const setAboutOpen = useVerityStore((s) => s.setAboutOpen);
 
   const validateClient = useCallback(
     (file: File): string | null => {
@@ -345,33 +356,105 @@ export function UploadView() {
   const displayError = localError ?? error;
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-10">
-      <div className="mb-6 text-center">
-        <h1 className="font-serif text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl">
-          Detect AI-generated text
-        </h1>
-        <p className="mt-2 text-sm text-stone-600 sm:text-base">
-          Upload a <code className="rounded bg-stone-100 px-1.5 py-0.5 text-xs">.docx</code>,{" "}
-          <code className="rounded bg-stone-100 px-1.5 py-0.5 text-xs">.pdf</code>, or{" "}
-          <code className="rounded bg-stone-100 px-1.5 py-0.5 text-xs">.txt</code> file (max 5 MB) and
-          get a seven-signal analysis with an aggregate verdict, evidence snippets, and a downloadable
-          report.
-        </p>
-      </div>
+    <div className="pb-12">
+      <section className="relative isolate overflow-hidden bg-stone-950">
+        <Image
+          src="/images/hero-library.webp"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-center opacity-75"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-gradient-to-r from-stone-950/95 via-stone-950/80 to-stone-950/25"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-gradient-to-t from-stone-950/80 via-transparent to-stone-950/20"
+        />
+        <div className="relative mx-auto grid w-full max-w-6xl gap-10 px-4 pb-20 pt-12 sm:px-6 sm:pb-24 sm:pt-16 lg:grid-cols-[1.4fr_0.9fr] lg:items-end">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-stone-100 backdrop-blur">
+              <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+              Seven-signal forensic analysis
+            </span>
+            <h1 className="mt-5 max-w-2xl font-serif text-4xl font-semibold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">
+              Read between the lines.
+            </h1>
+            <p className="mt-4 max-w-xl text-sm leading-relaxed text-stone-300 sm:text-base">
+              VerityText weighs perplexity, burstiness, repetition, vocabulary,
+              specificity, tone, and statistical fingerprints — then shows you
+              the evidence behind every verdict.
+            </p>
+            <div className="mt-7 flex flex-wrap items-center gap-3">
+              <Button
+                size="lg"
+                className="gap-2 rounded-full bg-white px-5 text-stone-900 shadow-lg shadow-stone-950/30 hover:bg-stone-100"
+                onClick={() =>
+                  document.getElementById("upload")?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "start",
+                  })
+                }
+              >
+                Analyze a document <ArrowDown className="size-4" />
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="gap-2 rounded-full border-white/25 bg-white/5 text-white hover:bg-white/15 hover:text-white"
+                onClick={() => setAboutOpen(true)}
+              >
+                <BookOpen className="size-4" /> How it works
+              </Button>
+            </div>
+            <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-stone-400">
+              <span className="inline-flex items-center gap-1">
+                <ShieldCheck className="size-3.5 text-emerald-400" /> No account required
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>In-memory by default</span>
+              <span aria-hidden="true">·</span>
+              <span>DOCX, PDF, TXT</span>
+            </p>
+          </div>
 
-      <Card
-        className={cn(
-          "border-stone-200 transition-colors",
-          dragOver && "border-stone-400 bg-stone-50",
-        )}
-      >
+          <dl className="grid grid-cols-3 divide-x divide-white/15 overflow-hidden rounded-2xl border border-white/15 bg-white/[0.07] text-center backdrop-blur-md lg:grid-cols-1 lg:divide-x-0 lg:divide-y">
+            {HERO_STATS.map((stat) => (
+              <div
+                key={stat.label}
+                className="flex flex-col-reverse px-4 py-4 lg:flex-row-reverse lg:items-baseline lg:justify-between lg:px-5"
+              >
+                <dt className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-stone-300 lg:mt-0">
+                  {stat.label}
+                </dt>
+                <dd className="font-serif text-2xl font-semibold text-white">
+                  {stat.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
+      <div id="upload" className="mx-auto w-full max-w-3xl scroll-mt-28 px-4 sm:px-6">
+        <Card
+          className={cn(
+            "-mt-12 border-stone-200 bg-white/95 shadow-xl shadow-stone-900/5 backdrop-blur transition-colors",
+            dragOver && "border-stone-400 bg-white",
+          )}
+        >
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-stone-900">
             <UploadCloud className="size-5" />
             Upload document
           </CardTitle>
           <CardDescription>
-            Drag &amp; drop a file here, or click to browse. Detection runs entirely on the server.
+            Drag &amp; drop a file here, or click to browse. Whole documents are
+            analyzed on the server — up to 1,000,000 characters (about 150,000
+            words).
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -413,7 +496,7 @@ export function UploadView() {
                 {uploading ? "Uploading…" : "Drop a file or click to browse"}
               </div>
               <div className="mt-1 text-xs text-stone-500">
-                .docx, .pdf, .txt — max 5 MB
+                .docx, .pdf, .txt — max 15 MB
               </div>
             </div>
             <input
@@ -464,6 +547,10 @@ export function UploadView() {
                   <X className="size-3" /> Cancel
                 </Button>
               </div>
+              <p className="text-[11px] text-stone-400">
+                The whole document is analyzed, not a sample. A 100,000-word
+                manuscript can take 10–20 seconds.
+              </p>
             </div>
           )}
 
@@ -617,6 +704,68 @@ export function UploadView() {
         the About dialog.
       </div>
     </div>
+
+      <section
+        aria-labelledby="signals-heading"
+        className="mx-auto mt-14 w-full max-w-6xl px-4 sm:px-6"
+      >
+        <div className="flex flex-col gap-4 border-t border-stone-200 pt-8 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-xs font-medium uppercase tracking-[0.18em] text-amber-700">
+              Inside the analysis
+            </div>
+            <h2
+              id="signals-heading"
+              className="mt-2 font-serif text-2xl font-semibold tracking-tight text-stone-900 sm:text-3xl"
+            >
+              Seven signals. One honest verdict.
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-stone-600">
+              No single number decides the outcome. Each signal is scored and
+              weighted, then read together — so you can see what drove the
+              verdict, not just the verdict itself.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => setAboutOpen(true)}
+            className="shrink-0 gap-1.5 self-start border-stone-300 bg-white/70 sm:self-auto"
+          >
+            <BookOpen className="size-4" /> Read the methodology
+          </Button>
+        </div>
+
+        <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          <FeatureCard
+            image="/images/typewriter.webp"
+            alt="Vintage typewriter with a sheet of paper"
+            eyebrow="01 · Predictability"
+            title="Perplexity & burstiness"
+          >
+            Vocabulary rarity and sentence-length variance — the most-cited
+            signatures in the detection literature.
+          </FeatureCard>
+          <FeatureCard
+            image="/images/writing-desk.webp"
+            alt="Notebook and pencil on a wooden writing desk"
+            eyebrow="02 · Structure"
+            title="Repetition & tone"
+          >
+            Mechanical transitions, repeated openers, uniform paragraphs, and a
+            flat-formal register.
+          </FeatureCard>
+          <FeatureCard
+            image="/images/manuscript-letters.webp"
+            alt="Handwritten letters spread across a table"
+            eyebrow="03 · Evidence"
+            title="Specificity & fingerprints"
+          >
+            Named entities, dates, numbers, quotes, and weak statistical
+            anomalies — shown with the snippets behind them.
+          </FeatureCard>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -645,5 +794,44 @@ function SampleButton({
       <span className="text-sm font-medium text-stone-900">{label}</span>
       <span className="text-xs text-stone-500">{desc}</span>
     </button>
+  );
+}
+
+function FeatureCard({
+  image,
+  alt,
+  eyebrow,
+  title,
+  children,
+}: {
+  image: string;
+  alt: string;
+  eyebrow: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <article className="group overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-sm transition-shadow hover:shadow-md">
+      <div className="relative h-40 overflow-hidden">
+        <Image
+          src={image}
+          alt={alt}
+          fill
+          sizes="(min-width: 640px) 33vw, 100vw"
+          className="object-cover transition-transform duration-700 group-hover:scale-[1.04]"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-gradient-to-t from-stone-950/60 via-stone-950/5 to-transparent"
+        />
+        <span className="absolute bottom-3 left-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/85">
+          {eyebrow}
+        </span>
+      </div>
+      <div className="p-4">
+        <h3 className="font-serif text-lg font-semibold text-stone-900">{title}</h3>
+        <p className="mt-1 text-xs leading-relaxed text-stone-600">{children}</p>
+      </div>
+    </article>
   );
 }

@@ -5,11 +5,11 @@ import { ShieldAlert } from "lucide-react";
 export function VerityFooter() {
   return (
     <footer
-      className="mt-auto w-full border-t border-stone-200 bg-stone-50"
+      className="mt-auto w-full border-t border-stone-200 bg-stone-50/90"
       role="contentinfo"
     >
-      <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6">
-        <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+      <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
+        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
           <div className="text-xs text-stone-600">
             <div className="font-serif text-sm font-semibold text-stone-900">VerityText</div>
             <div className="text-stone-500">AI Text Detector &amp; Humanizer — v1.0</div>
@@ -21,6 +21,58 @@ export function VerityFooter() {
               use as sole evidence in academic, legal, or employment decisions.
             </span>
           </div>
+        </div>
+
+        <div className="mt-5 flex flex-col gap-2 border-t border-stone-200 pt-3 text-[10px] leading-relaxed text-stone-400 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            Photography:{" "}
+            <a
+              href="https://www.pexels.com/photo/38998691/"
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-stone-300 underline-offset-2 hover:text-stone-600"
+            >
+              Mico Medel
+            </a>
+            ,{" "}
+            <a
+              href="https://www.pexels.com/photo/8872430/"
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-stone-300 underline-offset-2 hover:text-stone-600"
+            >
+              MART PRODUCTION
+            </a>
+            ,{" "}
+            <a
+              href="https://www.pexels.com/photo/419635/"
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-stone-300 underline-offset-2 hover:text-stone-600"
+            >
+              ClickerHappy
+            </a>
+            ,{" "}
+            <a
+              href="https://www.pexels.com/photo/10288924/"
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-stone-300 underline-offset-2 hover:text-stone-600"
+            >
+              Ylanite Koppens
+            </a>{" "}
+            via Pexels;{" "}
+            <a
+              href="https://pixabay.com/photos/paper-old-texture-parchment-1074131/"
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-stone-300 underline-offset-2 hover:text-stone-600"
+            >
+              ChrisFiedler
+            </a>{" "}
+            via Pixabay.
+          </p>
+          <p className="shrink-0">Built with Next.js · Methodology in the About dialog.</p>
         </div>
       </div>
     </footer>

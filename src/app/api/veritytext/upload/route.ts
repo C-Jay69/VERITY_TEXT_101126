@@ -1,5 +1,5 @@
 // POST /api/veritytext/upload
-// Multipart form-data with a `file` field (.docx / .pdf / .txt, <= 5 MB).
+// Multipart form-data with a `file` field (.docx / .pdf / .txt, <= 15 MB).
 // Validates extension + MIME + magic bytes, extracts text, runs detection,
 // creates a session, and returns { sessionId, meta, extractedLength, report }.
 import { NextRequest, NextResponse } from "next/server";
@@ -17,7 +17,7 @@ import {
 export const runtime = "nodejs";
 
 // Next.js Route Handlers parse multipart bodies natively via `req.formData()`,
-// but we enforce the 5 MB cap before reading by checking the Content-Length
+// but we enforce the 15 MB cap before reading by checking the Content-Length
 // header (browsers always send it for multipart uploads).
 export async function POST(req: NextRequest) {
   try {
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
       // Allow a 512 KB margin for multipart encoding overhead.
       return NextResponse.json(
         {
-          error: `Upload too large. Maximum file size is 5.00 MB (5,242,880 bytes).`,
+          error: `Upload too large. Maximum file size is 15.00 MB (15,728,640 bytes).`,
         },
         { status: 413 },
       );
