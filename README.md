@@ -37,19 +37,27 @@ No database migration is required — all session state is in-memory.
 ### Environment variables
 
 Detection needs **no configuration at all**. The only optional configuration is
-the humanizer's LLM backend and the optional Prisma/SQLite history store. Copy
-`.env.example` to `.env` if you want to configure them.
+the humanizer's LLM backend and the optional Prisma history store (SQLite or
+Postgres). Copy `.env.example` to `.env` if you want to configure them.
 
-The humanizer supports either:
+The humanizer supports any of these, checked in order:
 
 1. **Any OpenAI-compatible API** via `LLM_BASE_URL`, `LLM_API_KEY`, and
-   `LLM_MODEL` (the conventional `OPENAI_*` names also work), or
-2. **`z-ai-web-dev-sdk`**, which reads a `.z-ai-config` JSON file from the
+   `LLM_MODEL`.
+2. **OpenRouter** via `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, and the
+   optional `OPENROUTER_BASE_URL` (default `https://openrouter.ai/api/v1`).
+   Use a chat-capable model ID — batch-only IDs ending in `:batch` are
+   rejected by OpenRouter's `/chat/completions` endpoint.
+3. **OpenAI directly** via `OPENAI_API_KEY`, `OPENAI_MODEL`, and
+   `OPENAI_BASE_URL`.
+4. **`z-ai-web-dev-sdk`**, which reads a `.z-ai-config` JSON file from the
    project root, your home directory, or `/etc` (the path used in the Z.ai
    sandbox).
 
-If neither is configured, the humanizer degrades gracefully: it returns the
-original text with a visible error banner, and detection still works normally.
+Each provider is resolved as a whole (base URL, key, and model together), so a
+key is never paired with another provider's endpoint. If none is configured,
+the humanizer degrades gracefully: it returns the original text with a visible
+error banner, and detection still works normally.
 
 ---
 
@@ -264,4 +272,5 @@ README.md
 Built on Next.js 16, TypeScript, Tailwind CSS 4, and shadcn/ui. Document
 parsing via `mammoth` (DOCX), `pdf-parse` (PDF), and `Buffer.toString('utf8')`
 (TXT). PDF report generation via `pdfkit`. DOCX regeneration via the `docx`
-package. Language-model humanization via `z-ai-web-dev-sdk`.
+package. Language-model humanization via any OpenAI-compatible provider
+(OpenRouter, OpenAI, or a custom endpoint) or `z-ai-web-dev-sdk`.

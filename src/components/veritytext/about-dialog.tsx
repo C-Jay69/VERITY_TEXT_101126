@@ -211,7 +211,8 @@ export function AboutDialog() {
               <p className="mt-1">
                 Uploaded documents live only in server memory for up to 1 hour and are never written
                 to disk. Sessions expire automatically. The humanizer sends the extracted text to the
-                Z.ai language model — do not upload text you cannot send to an LLM.
+                configured language-model provider (OpenRouter, OpenAI, or Z.ai) — do not upload text
+                you cannot send to an LLM.
               </p>
             </section>
           </div>

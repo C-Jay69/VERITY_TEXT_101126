@@ -1,8 +1,12 @@
 // Small LLM client used by the humanizer.
 //
 // Two backends are supported, in priority order:
-//   1. Any OpenAI-compatible endpoint configured through environment variables
-//      (LLM_BASE_URL + LLM_API_KEY + LLM_MODEL). This is the portable path.
+//   1. Any OpenAI-compatible endpoint configured through environment variables.
+//      Resolution order (first provider with a key wins, so a base URL and key
+//      never come from different providers):
+//        a. LLM_*       — LLM_BASE_URL + LLM_API_KEY + LLM_MODEL
+//        b. OPENROUTER_* — OPENROUTER_BASE_URL + OPENROUTER_API_KEY + OPENROUTER_MODEL
+//        c. OPENAI_*    — OPENAI_BASE_URL + OPENAI_API_KEY + OPENAI_MODEL
 //   2. `z-ai-web-dev-sdk`, which reads a `.z-ai-config` JSON file from the
 //      project root, the user's home directory, or /etc. This is the path used
 //      in the Z.ai sandbox.
@@ -28,33 +32,62 @@ interface EnvConfig {
   baseUrl: string;
   apiKey: string;
   model: string;
+  /** Extra provider-specific headers (e.g. OpenRouter attribution). */
+  headers?: Record<string, string>;
 }
 
 /**
  * Resolve an OpenAI-compatible configuration from the environment, if present.
- * `LLM_*` takes precedence; the conventional `OPENAI_*` names are accepted as
- * a fallback so an existing OpenAI key "just works".
+ * Providers are checked as whole units (base URL, key, and model together) so a
+ * key is never paired with another provider's endpoint.
  */
 export function envLLMConfig(): EnvConfig | null {
-  const apiKey =
-    process.env.LLM_API_KEY?.trim() ||
-    process.env.OPENAI_API_KEY?.trim() ||
-    "";
-  if (!apiKey) return null;
-  const baseUrl = (
-    process.env.LLM_BASE_URL?.trim() ||
-    process.env.OPENAI_BASE_URL?.trim() ||
-    "https://api.openai.com/v1"
-  ).replace(/\/+$/, "");
-  const model =
-    process.env.LLM_MODEL?.trim() ||
-    process.env.OPENAI_MODEL?.trim() ||
-    "gpt-4o-mini";
-  return { baseUrl, apiKey, model };
+  const llmKey = process.env.LLM_API_KEY?.trim();
+  if (llmKey) {
+    return {
+      baseUrl: (
+        process.env.LLM_BASE_URL?.trim() || "https://api.openai.com/v1"
+      ).replace(/\/+$/, ""),
+      apiKey: llmKey,
+      model: process.env.LLM_MODEL?.trim() || "gpt-4o-mini",
+    };
+  }
+
+  const openRouterKey = process.env.OPENROUTER_API_KEY?.trim();
+  if (openRouterKey) {
+    const headers: Record<string, string> = {};
+    // Optional attribution headers recommended by OpenRouter.
+    const referer = process.env.OPENROUTER_SITE_URL?.trim();
+    const title = process.env.OPENROUTER_APP_NAME?.trim();
+    if (referer) headers["HTTP-Referer"] = referer;
+    if (title) headers["X-Title"] = title;
+    return {
+      baseUrl: (
+        process.env.OPENROUTER_BASE_URL?.trim() ||
+        "https://openrouter.ai/api/v1"
+      ).replace(/\/+$/, ""),
+      apiKey: openRouterKey,
+      model: process.env.OPENROUTER_MODEL?.trim() || "openai/gpt-4o-mini",
+      headers,
+    };
+  }
+
+  const openAIKey = process.env.OPENAI_API_KEY?.trim();
+  if (openAIKey) {
+    return {
+      baseUrl: (
+        process.env.OPENAI_BASE_URL?.trim() || "https://api.openai.com/v1"
+      ).replace(/\/+$/, ""),
+      apiKey: openAIKey,
+      model: process.env.OPENAI_MODEL?.trim() || "gpt-4o-mini",
+    };
+  }
+
+  return null;
 }
 
 const NOT_CONFIGURED =
-  "Humanizer LLM is not configured. Create a .z-ai-config file (see README) or set LLM_BASE_URL, LLM_API_KEY, and LLM_MODEL.";
+  "Humanizer LLM is not configured. Create a .z-ai-config file (see README) or set LLM_* / OPENROUTER_* / OPENAI_* environment variables.";
 
 function abortError(): Error {
   const err = new Error("Humanizing cancelled.");
@@ -78,6 +111,7 @@ async function openAIChat(
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${cfg.apiKey}`,
+      ...(cfg.headers ?? {}),
     },
     body: JSON.stringify({
       model: cfg.model,
