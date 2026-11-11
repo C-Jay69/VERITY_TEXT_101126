@@ -170,16 +170,23 @@ export function extractEntities(text: string): {
   values: string[];
 } {
   const doc = nlp(text);
-  // Some compromise builds expose `.dates()`, others don't. Guard.
-  const datesOut: string[] = typeof (doc as unknown as { dates?: () => { out: (m: string) => string[] } }).dates === "function"
-    ? (doc as unknown as { dates: () => { out: (m: string) => string[] } }).dates().out("array")
-    : [];
+  // Some compromise builds expose `.dates()` / `.values()`, others don't.
+  // Guard both so a missing helper degrades to an empty list rather than a
+  // runtime TypeError.
+  const docAny = doc as unknown as {
+    dates?: () => { out: (m: string) => string[] };
+    values?: () => { out: (m: string) => string[] };
+  };
+  const datesOut: string[] =
+    typeof docAny.dates === "function" ? docAny.dates().out("array") : [];
+  const valuesOut: string[] =
+    typeof docAny.values === "function" ? docAny.values().out("array") : [];
   return {
     people: doc.people().out("array"),
     organizations: doc.organizations().out("array"),
     places: doc.places().out("array"),
     dates: datesOut,
-    values: doc.values().out("array"),
+    values: valuesOut,
   };
 }
 

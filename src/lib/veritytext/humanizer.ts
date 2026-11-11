@@ -1,9 +1,9 @@
-// VerityText humanizer engine — uses z-ai-web-dev-sdk server-side only.
+// VerityText humanizer engine — server-side only.
 //
 // Builds a tightly engineered system prompt that inverts each detected signal,
 // then calls the LLM. Wraps in try/catch; on failure returns the original
 // text with an error so the UI can surface a banner. Never returns blank.
-import ZAI from "z-ai-web-dev-sdk";
+import { completeText, streamText, NOT_CONFIGURED } from "./llm";
 import { type DetectionReport, type SignalResult } from "./detector/types";
 
 export interface HumanizeOptions {
@@ -153,11 +153,17 @@ function signalDirective(
 ): string | null {
   switch (sig.key) {
     case "perplexity": {
-      const m = sig.metrics?.meanPerplexity;
-      if (typeof m === "number") {
-        return `PERPLEXITY: current mean is ${m.toFixed(2)}; raise it by replacing common/predictable words with rarer, more specific ones.`;
-      }
-      return "PERPLEXITY: replace predictable word choices with rarer alternatives.";
+      // The signal reports a rare-token fraction (0..1) and average word
+      // length; there is no log-probability perplexity to report.
+      const rare = sig.metrics?.rareFraction;
+      const rareSd = sig.metrics?.rareFractionStdDev;
+      const avgLen = sig.metrics?.avgWordLength;
+      const bits: string[] = [];
+      if (typeof rare === "number") bits.push(`rare-token fraction ${rare.toFixed(2)}`);
+      if (typeof rareSd === "number") bits.push(`variation ${rareSd.toFixed(2)}`);
+      if (typeof avgLen === "number") bits.push(`average word length ${avgLen.toFixed(2)}`);
+      { const detail = bits.length > 0 ? `current ${bits.join(", ")}` : "predictable vocabulary";
+        return `PERPLEXITY: ${detail}. Raise vocabulary variety by replacing common, predictable words with rarer, more specific ones.`; }
     }
     case "burstiness": {
       const cv = sig.metrics?.coefficientOfVariation;
@@ -192,13 +198,15 @@ function signalDirective(
 }
 
 /**
- * Run the humanizer. Returns the rewritten text. On LLM failure, returns the
- * original text plus an `error` field so the UI can show a banner.
+ * Run the humanizer (non-streaming). Returns the rewritten text. On LLM
+ * failure, returns the original text plus an `error` field so the UI can show
+ * a banner. Never returns blank.
  */
 export async function humanizeText(
   originalText: string,
   report: DetectionReport,
   options: HumanizeOptions,
+  signal?: AbortSignal,
 ): Promise<HumanizeResult> {
   if (shouldRefuse(originalText)) {
     return { text: originalText, error: ACCEPTABLE_USE_REFUSAL };
@@ -206,29 +214,94 @@ export async function humanizeText(
 
   const systemPrompt = buildSystemPrompt(report, options);
   try {
-    const zai = await ZAI.create();
-    const completion = await zai.chat.completions.create({
+    const rewritten = await completeText({
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: originalText.slice(0, 50_000) },
       ],
-      temperature: options.strength === "strong" ? 0.9 : options.strength === "balanced" ? 0.8 : 0.6,
+      temperature:
+        options.strength === "strong" ? 0.9 : options.strength === "balanced" ? 0.8 : 0.6,
+      signal,
     });
-    const rewritten =
-      (completion?.choices?.[0]?.message?.content as string | undefined) ?? "";
-    if (!rewritten || !rewritten.trim()) {
+    if (!rewritten) {
       return {
         text: originalText,
         error: "Humanizer returned an empty response — showing original text.",
       };
     }
-    return { text: rewritten.trim() };
+    return { text: rewritten };
   } catch (err) {
+    if ((err as Error)?.name === "AbortError") {
+      return { text: originalText, error: "Humanizing cancelled." };
+    }
     const msg = err instanceof Error ? err.message : String(err);
     return {
       text: originalText,
       error: `Humanizer unavailable — showing original text. (${msg})`,
     };
+  }
+}
+
+export type HumanizeStreamEvent =
+  | { type: "delta"; text: string }
+  | {
+      type: "done";
+      text: string;
+      error?: string;
+    };
+
+/**
+ * Streaming humanizer. Yields `delta` events as the model produces tokens,
+ * then a single `done` event carrying the complete text (or the original text
+ * plus an error if the model is unavailable).
+ */
+export async function* humanizeTextStream(
+  originalText: string,
+  report: DetectionReport,
+  options: HumanizeOptions,
+  signal?: AbortSignal,
+): AsyncGenerator<HumanizeStreamEvent> {
+  if (shouldRefuse(originalText)) {
+    yield { type: "done", text: originalText, error: ACCEPTABLE_USE_REFUSAL };
+    return;
+  }
+
+  const systemPrompt = buildSystemPrompt(report, options);
+  const temperature =
+    options.strength === "strong" ? 0.9 : options.strength === "balanced" ? 0.8 : 0.6;
+  let accumulated = "";
+
+  try {
+    for await (const delta of streamText({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: originalText.slice(0, 50_000) },
+      ],
+      temperature,
+      signal,
+    })) {
+      if (delta) {
+        accumulated += delta;
+        yield { type: "delta", text: delta };
+      }
+    }
+    if (!accumulated.trim()) {
+      yield {
+        type: "done",
+        text: originalText,
+        error: "Humanizer returned an empty response — showing original text.",
+      };
+      return;
+    }
+    yield { type: "done", text: accumulated.trim() };
+  } catch (err) {
+    if ((err as Error)?.name === "AbortError" || signal?.aborted) {
+      yield { type: "done", text: originalText, error: "Humanizing cancelled." };
+      return;
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    const prefix = /not configured/i.test(msg) ? NOT_CONFIGURED : `Humanizer unavailable — showing original text. (${msg})`;
+    yield { type: "done", text: originalText, error: prefix };
   }
 }
 

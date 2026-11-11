@@ -15,6 +15,8 @@ export function buildJsonReport(session: Session): object {
       size: session.fileSize,
       type: session.fileType.replace(/^\./, ""),
     },
+    // Included at the top level to match the documented report schema.
+    extractedTextLength: session.extractedLength,
     meta: {
       extractedLength: session.extractedLength,
       partialAnalysis: report.meta.partialAnalysis,
@@ -56,6 +58,9 @@ export async function buildPdfReport(session: Session): Promise<Buffer> {
       const doc = new PDFDocument({
         size: "A4",
         margins: { top: 56, bottom: 72, left: 56, right: 56 },
+        // Required so we can switchToPage() and stamp the mandatory disclaimer
+        // footer on every page after the content has been laid out.
+        bufferPages: true,
         info: {
           Title: `VerityText Report — ${session.filename}`,
           Author: "VerityText",
@@ -234,9 +239,17 @@ export async function buildPdfReport(session: Session): Promise<Buffer> {
       }
 
       // --- Footer (on every page) ---
-      const pages = doc.bufferedPageCount;
-      for (let i = 0; i < pages; i++) {
+      // pdfkit only buffers pages when `bufferPages: true` (set above). Use the
+      // documented `bufferedPageRange()` accessor rather than an ad-hoc count.
+      const range = doc.bufferedPageRange();
+      const pageCount = range.count;
+      for (let i = range.start; i < range.start + range.count; i++) {
         doc.switchToPage(i);
+        // Temporarily remove the bottom margin so stamping text in the footer
+        // area cannot overflow and trigger pagination (which would add blank
+        // pages every time we write the footer).
+        const savedBottom = doc.page.margins.bottom;
+        doc.page.margins.bottom = 0;
         drawHr(doc, margin, pageHeight - 56, contentWidth);
         doc
           .fontSize(7)
@@ -251,11 +264,12 @@ export async function buildPdfReport(session: Session): Promise<Buffer> {
           .font("Helvetica")
           .fillColor("#a8a29e")
           .text(
-            `VerityText Report — page ${i + 1} of ${pages}`,
+            `VerityText Report — page ${i - range.start + 1} of ${pageCount}`,
             margin,
             pageHeight - 26,
             { width: contentWidth, align: "left" },
           );
+        doc.page.margins.bottom = savedBottom;
       }
 
       doc.end();
@@ -265,7 +279,7 @@ export async function buildPdfReport(session: Session): Promise<Buffer> {
   });
 }
 
-function drawHr(doc: PDFKit.PDFDocument, x: number, y: number, w: number): void {
+function drawHr(doc: PDFDocument, x: number, y: number, w: number): void {
   doc
     .moveTo(x, y)
     .lineTo(x + w, y)
@@ -306,7 +320,7 @@ export async function buildDocxFromText(text: string): Promise<Buffer> {
     if (lines.length === 1 && (lines[0] === lines[0].toUpperCase() || lines[0].length < 60)) {
       paragraphs.push(
         new Paragraph({
-          heading: HeadingLevel.Heading1,
+          heading: HeadingLevel.HEADING_1,
           children: [new TextRun({ text: lines[0], bold: true })],
         }),
       );

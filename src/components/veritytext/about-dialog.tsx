@@ -28,7 +28,7 @@ const ITEMS: MethodologyItem[] = [
     name: "Perplexity",
     weight: DEFAULT_WEIGHTS.perplexity,
     formula:
-      "Per-token surprisal proxied by absence from a bundled ~1000-word frequent-words list (stopwords excluded). Per-sentence mean surprisal, then averaged. Lower mean → higher AI-likelihood. Map [0.20, 0.55] → [0.9, 0.05].",
+      "Per-sentence rare-token fraction (tokens absent from the stopword list, the ~1860-word frequent list, and the AI lexicon), then: sdScore = clamp01((0.18 − sd)/0.13), lenScore = clamp01((avgWordLen − 4.5)/1.5), meanRareScore = clamp01((0.45 − mean)/0.30); score = 0.35·sdScore + 0.45·lenScore + 0.20·meanRareScore.",
     rationale:
       "LLMs sample from the most probable next-token distribution and tend to pick common words; humans reach for rarer, more specific vocabulary. True perplexity needs a log-probability model — we use the frequency proxy to stay self-contained and fast.",
     caveats:
@@ -61,7 +61,7 @@ const ITEMS: MethodologyItem[] = [
     name: "Generic Vocabulary",
     weight: DEFAULT_WEIGHTS.vocabulary,
     formula:
-      "Counts occurrences of ~150 curated AI-favorite words/phrases (delve, tapestry, leverage, robust, …). Density per 1000 words, normalized to [0, 1] at 8/1000.",
+      "Counts occurrences of 244 curated AI-favorite words/phrases (delve, tapestry, leverage, robust, …). Density per 1000 words, normalized to [0, 1] at 8/1000.",
     rationale:
       "A specific cluster of words is statistically over-represented in LLM output. The lexicon is editable in src/lib/veritytext/detector/ai_lexicon.json.",
     caveats:

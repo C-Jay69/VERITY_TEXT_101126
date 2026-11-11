@@ -38,17 +38,25 @@ internally; it is always labeled "weak/probabilistic" in the UI.
 
 **Formula:**
 1. Tokenize each sentence, lowercasing and keeping `[a-z0-9'’-]+`.
-2. For each token, compute a surprisal proxy: `0` if the token is a stopword
-   (articles, prepositions, common pronouns) or appears in the bundled ~1000-word
-   frequent-words list; `1` otherwise.
-3. Per-sentence perplexity = mean surprisal of its tokens (excluding stopword-
-   only sentences).
-4. Mean perplexity across all sentences.
-5. Score = `clamp01((0.55 − meanPerplexity) / 0.35)` — lower mean perplexity →
-   higher AI-likelihood.
+2. For each token, mark it "rare" if it is **not** in the stopword allow-list,
+   the bundled ~1860-word frequent-words list, or the AI-favorite lexicon
+   (so `delve`/`tapestry` do not inflate rarity — they are predictable for AI).
+3. Per-sentence rare fraction = rare tokens / tokens.
+4. Compute three sub-metrics over the document:
+   - `sdRare` — standard deviation of the per-sentence rare fractions
+     (uniform vocabulary → low variation → AI-like).
+   - `avgWordLen` — mean token length (longer, more "academic" words → AI-like).
+   - `meanRare` — mean rare fraction (lower → more predictable → AI-like).
+5. Composite score:
+   ```
+   sdScore       = clamp01((0.18 − sdRare) / 0.13)
+   lenScore      = clamp01((avgWordLen − 4.5) / 1.5)
+   meanRareScore = clamp01((0.45 − meanRare) / 0.30)
+   score = 0.35·sdScore + 0.45·lenScore + 0.20·meanRareScore
+   ```
 
-**Evidence reported:** the 5 lowest-perplexity sentences (most predictable),
-each prefixed with its perplexity value.
+**Evidence reported:** the 5 lowest-rare-fraction sentences (most predictable),
+each prefixed with its rare fraction.
 
 **Why this weight:** Perplexity is the single most-cited signal in the
 literature and tends to have the largest effect size between human and AI text
@@ -140,7 +148,7 @@ many transitions). 0.15 balances visibility against genre noise.
 
 ## Signal 4 — Generic Vocabulary (weight 0.15)
 
-**What it measures:** Frequency of a curated list of ~150 AI-favorite words
+**What it measures:** Frequency of a curated list of 244 AI-favorite words
 and phrases.
 
 **Formula:**

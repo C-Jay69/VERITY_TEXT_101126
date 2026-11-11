@@ -25,6 +25,7 @@ import {
   Wand2,
   CheckCircle2,
   ShieldAlert,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -85,23 +86,31 @@ export function HumanizeView() {
   const [preserve, setPreserve] = useState<string[]>(["citations", "names", "dates", "quotes"]);
   const [originalText, setOriginalText] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [streamingText, setStreamingText] = useState<string | null>(null);
+  const [cancelController, setCancelController] = useState<AbortController | null>(null);
 
   const runHumanize = useCallback(
     async (opts?: { reRun?: boolean; strength?: "light" | "balanced" | "strong" }) => {
       if (!sessionId || !report) return;
       setHumanizeLoading(true);
       setHumanizeError(null);
+      setStreamingText("");
+      const controller = new AbortController();
+      setCancelController(controller);
       try {
         const res = await fetch(`/api/veritytext/humanize/${sessionId}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             strength: opts?.strength ?? strength,
             tone,
             preserve,
             reRun: opts?.reRun ?? false,
+            stream: true,
           }),
         });
+
         if (!res.ok) {
           let msg = `Humanize failed (HTTP ${res.status}).`;
           try {
@@ -111,25 +120,95 @@ export function HumanizeView() {
             // ignore
           }
           setHumanizeError(msg);
+          setStreamingText(null);
           return;
         }
-        const data = (await res.json()) as HumanizeResponse;
-        setHumanize({
-          text: data.humanizedText,
-          report: data.report,
-          originalScore: data.originalScore,
-          newScore: data.newScore,
-          warning: data.warning ?? null,
-          error: data.error ?? null,
-        });
+
+        const contentType = res.headers.get("content-type") ?? "";
+
+        // Fallback: a non-SSE JSON response (e.g. an older server or a proxy
+        // that buffered the stream) — parse it directly.
+        if (!contentType.includes("text/event-stream") || !res.body) {
+          const data = (await res.json()) as HumanizeResponse;
+          setHumanize({
+            text: data.humanizedText,
+            report: data.report,
+            originalScore: data.originalScore,
+            newScore: data.newScore,
+            warning: data.warning ?? null,
+            error: data.error ?? null,
+          });
+          setStreamingText(null);
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let accumulated = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let boundary: number;
+          while ((boundary = buffer.indexOf("\n\n")) >= 0) {
+            const frame = buffer.slice(0, boundary);
+            buffer = buffer.slice(boundary + 2);
+            const dataLine = frame
+              .split("\n")
+              .find((line) => line.startsWith("data:"));
+            if (!dataLine) continue;
+            let payload: {
+              type?: string;
+              text?: string;
+              error?: string;
+              warning?: string;
+              originalScore?: number;
+              newScore?: number;
+              report?: DetectionReport;
+            };
+            try {
+              payload = JSON.parse(dataLine.slice(5).trim());
+            } catch {
+              continue;
+            }
+            if (payload.type === "delta" && payload.text) {
+              accumulated += payload.text;
+              setStreamingText(accumulated);
+            } else if (payload.type === "done") {
+              setHumanize({
+                text: payload.text ?? accumulated,
+                report: payload.report as DetectionReport,
+                originalScore: payload.originalScore ?? 0,
+                newScore: payload.newScore ?? 0,
+                warning: payload.warning ?? null,
+                error: payload.error ?? null,
+              });
+              setStreamingText(null);
+            } else if (payload.type === "error") {
+              setHumanizeError(payload.error ?? "Humanizer failed.");
+              setStreamingText(null);
+            }
+          }
+        }
       } catch (e) {
-        setHumanizeError(e instanceof Error ? e.message : "Humanize failed.");
+        if ((e as Error).name === "AbortError") {
+          setHumanizeError("Humanizing cancelled.");
+        } else {
+          setHumanizeError(e instanceof Error ? e.message : "Humanize failed.");
+        }
+        setStreamingText(null);
       } finally {
         setHumanizeLoading(false);
+        setCancelController(null);
       }
     },
     [sessionId, report, strength, tone, preserve, setHumanize, setHumanizeError, setHumanizeLoading],
   );
+
+  const cancelHumanize = useCallback(() => {
+    if (cancelController) cancelController.abort();
+  }, [cancelController]);
 
   // Lazy-load original text for the side-by-side comparison.
   const loadOriginal = useCallback(async () => {
@@ -328,6 +407,17 @@ export function HumanizeView() {
               )}
             </Button>
 
+            {humanizeLoading && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={cancelHumanize}
+              >
+                <X className="size-4" /> Cancel
+              </Button>
+            )}
+
             {humanizeError && (
               <Alert variant="destructive">
                 <AlertTriangle className="size-4" />
@@ -417,6 +507,11 @@ export function HumanizeView() {
                   {humanizedText ? (
                     <div className="p-3 font-serif text-[12px] leading-relaxed">
                       <DiffView a={originalText ?? ""} b={humanizedText} />
+                    </div>
+                  ) : streamingText ? (
+                    <div className="p-3 font-serif text-[12px] leading-relaxed whitespace-pre-wrap">
+                      {streamingText}
+                      <span className="ml-0.5 inline-block animate-pulse text-stone-400">▍</span>
                     </div>
                   ) : (
                     <div className="p-3 text-[12px] text-stone-500">

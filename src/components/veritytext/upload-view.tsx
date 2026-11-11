@@ -26,6 +26,7 @@ interface UploadResponse {
     warnings: string[];
   };
   report: DetectionReport;
+  extractedLength?: number;
 }
 
 export function UploadView() {
@@ -107,7 +108,7 @@ export function UploadView() {
           fileType: data.meta.fileType,
           fileSize: data.meta.fileSize,
           wordCount: data.meta.wordCount,
-          extractedLength: data.meta.fileSize,
+          extractedLength: data.extractedLength ?? data.meta.fileSize,
           partialAnalysis: data.meta.partialAnalysis,
           warnings: data.meta.warnings ?? [],
         };

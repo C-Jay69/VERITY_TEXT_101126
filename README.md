@@ -13,27 +13,43 @@ rewrites ("humanizes") the text to reduce the detected signals.
 
 ## Quick start
 
-The dev server is already running on port 3000 in the sandbox. To run locally:
+```bash
+npm install
+npm run dev          # http://localhost:3000
+```
+
+or, with Bun:
 
 ```bash
 bun install
 bun run dev          # http://localhost:3000
 ```
 
-To check code quality:
+To check types and lint:
 
 ```bash
-bun run lint
+npx tsc --noEmit
+npm run lint
 ```
 
-> Do NOT run `bun run build` in the sandbox — the dev server is the supported
-> path. There is no database to migrate; all session state is in-memory.
+No database migration is required — all session state is in-memory.
 
 ### Environment variables
 
-The `z-ai-web-dev-sdk` is pre-authenticated in the Z.ai sandbox. **No
-environment variables are required for v1.** See `.env.example` for the
-optional variables you can set when running outside the sandbox.
+Detection needs **no configuration at all**. The only optional configuration is
+the humanizer's LLM backend and the optional Prisma/SQLite history store. Copy
+`.env.example` to `.env` if you want to configure them.
+
+The humanizer supports either:
+
+1. **Any OpenAI-compatible API** via `LLM_BASE_URL`, `LLM_API_KEY`, and
+   `LLM_MODEL` (the conventional `OPENAI_*` names also work), or
+2. **`z-ai-web-dev-sdk`**, which reads a `.z-ai-config` JSON file from the
+   project root, your home directory, or `/etc` (the path used in the Z.ai
+   sandbox).
+
+If neither is configured, the humanizer degrades gracefully: it returns the
+original text with a visible error banner, and detection still works normally.
 
 ---
 
@@ -49,7 +65,7 @@ high and the rest are low, the verdict is downgraded one band and labeled
 | 1 | Perplexity | 0.20 | Predictability of word choice (frequency-proxy surprisal). |
 | 2 | Burstiness | 0.20 | Sentence-length variation and structural diversity. |
 | 3 | Repetitive Patterns | 0.15 | Mechanical transitions, repeated openers, uniform paragraphs. |
-| 4 | Generic Vocabulary | 0.15 | Frequency of ~150 known AI-favorite words. |
+| 4 | Generic Vocabulary | 0.15 | Frequency of 244 known AI-favorite words. |
 | 5 | Lack of Specificity | 0.15 | Absence of named entities, dates, numbers-with-units, quotes. |
 | 6 | Uniform Tone | 0.10 | Flat-formal register, low sentiment variance, few markers. |
 | 7 | Statistical Fingerprints | 0.05 | Weak/probabilistic: punct-rhythm, bigram repetition, etc. |
@@ -133,7 +149,7 @@ All routes are relative (e.g. `POST /api/veritytext/upload`).
 |--------|-------|--------------|---------|
 | `POST` | `/api/veritytext/upload` | multipart `file` | `{ sessionId, meta, report }` |
 | `GET`  | `/api/veritytext/report/[sessionId]` | — | `{ sessionId, meta, report, humanized }` |
-| `POST` | `/api/veritytext/humanize/[sessionId]` | `{ strength, tone, preserve, reRun? }` | `{ humanizedText, originalScore, newScore, improved, warning?, error? }` |
+| `POST` | `/api/veritytext/humanize/[sessionId]` | `{ strength, tone, preserve, reRun?, stream? }` | JSON, or `text/event-stream` when `stream: true` |
 | `GET`  | `/api/veritytext/download/[sessionId]` | `?format=pdf\|json\|docx\|txt\|original&variant=original\|humanized` | binary file |
 | `GET`  | `/api/veritytext/sample/[name]` | `name = ai_sample \| human_sample \| hybrid_sample` | `{ sessionId, meta, report }` |
 
@@ -143,11 +159,12 @@ Sessions live in server memory for up to 1 hour and are never written to disk.
 
 ## The humanizer
 
-The humanizer calls the Z.ai language model server-side via
-`z-ai-web-dev-sdk` with a tightly engineered system prompt that inverts each
-detected signal. It always preserves all facts, citations, names, dates,
-numbers, and quotes. The output is re-scored automatically so you can see the
-improvement.
+The humanizer calls a configured LLM server-side — either an OpenAI-compatible
+endpoint (environment variables) or `z-ai-web-dev-sdk` (`.z-ai-config`) — with a
+tightly engineered system prompt that inverts each detected signal. It always
+preserves all facts, citations, names, dates, numbers, and quotes. Output is
+streamed token-by-token (Server-Sent Events) and is re-scored automatically so
+you can see the improvement. Long-running rewrites are cancellable.
 
 **Strengths:**
 - **Light** — conservative, ~10–15% wording changes.
@@ -155,6 +172,10 @@ improvement.
 - **Strong** — aggressive restructuring; targets ≥15-point score reduction. If
   the first strong pass doesn't hit that target, the UI surfaces a warning and
   offers a "Run stronger pass" button.
+
+**Re-score safety net.** If the rewritten text does not score *lower* than the
+original (any strength), the UI warns you and offers a stronger pass — a worse
+result is never shipped silently.
 
 **Acceptable use.** VerityText refuses to humanize text that combines ownership
 claims ("I personally wrote this") with academic submission markers ("submit",
@@ -199,6 +220,7 @@ src/
     │   ├── types.ts
     │   └── weights.ts
     ├── humanizer.ts
+    ├── llm.ts
     ├── parsing.ts
     ├── report.ts
     ├── session.ts

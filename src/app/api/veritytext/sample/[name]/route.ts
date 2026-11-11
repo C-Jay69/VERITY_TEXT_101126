@@ -54,6 +54,7 @@ export async function GET(
         warnings: report.meta.warnings,
       },
       report,
+      extractedLength: text.length,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to load sample.";

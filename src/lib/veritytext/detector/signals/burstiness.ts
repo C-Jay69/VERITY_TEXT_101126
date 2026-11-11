@@ -82,7 +82,7 @@ export function burstinessSignal(
   ];
   if (runEvidence.length > 0) {
     evidence.push(
-      `Most repetitive run: "${truncate(runEvidence[0], 180)}"`,
+      `Most repetitive run: "${truncate(runEvidence[0].text, 180)}"`,
     );
   }
   evidence.push(
