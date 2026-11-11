@@ -2,6 +2,11 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Without this, Next may infer the workspace root from a lockfile in a
+  // parent directory and nest the standalone server under that path.
+  turbopack: {
+    root: process.cwd(),
+  },
   /* config options here */
   typescript: {
     ignoreBuildErrors: true,

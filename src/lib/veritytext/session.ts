@@ -1,5 +1,6 @@
 // In-memory session store with a 1-hour TTL. Cleaned up on every access.
-// No documents persist beyond the TTL — uploads are never written to disk.
+// Sessions are never written to disk. Opt-in history rows live in Postgres
+// (see history.ts); that is the only place a document can outlive its TTL.
 //
 // IMPORTANT: we stash the Map on `globalThis` so it survives Next.js dev
 // hot-reloads and is shared across all route handlers (which may be bundled
@@ -26,6 +27,10 @@ export interface Session {
     error?: string;
     reHumanized?: boolean;
   };
+  /** True when this session has an opt-in row in the history database. */
+  historySaved?: boolean;
+  /** Anonymous owner cookie value that owns the history row. */
+  historyOwnerId?: string;
 }
 
 const TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -56,19 +61,34 @@ export function createSession(
     lastAccessedAt: now,
   };
   store.set(id, session);
-  // Evict oldest if we're over the cap.
-  if (store.size > MAX_SESSIONS) {
-    let oldest: string | null = null;
-    let oldestTime = Number.POSITIVE_INFINITY;
-    for (const [sid, s] of store) {
-      if (s.lastAccessedAt < oldestTime) {
-        oldestTime = s.lastAccessedAt;
-        oldest = sid;
-      }
-    }
-    if (oldest) store.delete(oldest);
-  }
+  evictIfNeeded();
   return session;
+}
+
+/**
+ * Insert a fully-formed session (e.g. restored from the history database)
+ * without generating a new ID.
+ */
+export function insertSession(session: Session): Session {
+  cleanup();
+  session.lastAccessedAt = Date.now();
+  store.set(session.id, session);
+  evictIfNeeded();
+  return session;
+}
+
+function evictIfNeeded(): void {
+  // Evict oldest if we're over the cap.
+  if (store.size <= MAX_SESSIONS) return;
+  let oldest: string | null = null;
+  let oldestTime = Number.POSITIVE_INFINITY;
+  for (const [sid, s] of store) {
+    if (s.lastAccessedAt < oldestTime) {
+      oldestTime = s.lastAccessedAt;
+      oldest = sid;
+    }
+  }
+  if (oldest) store.delete(oldest);
 }
 
 export function getSession(id: string): Session | null {

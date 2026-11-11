@@ -384,13 +384,23 @@ editing is never blocked.
 
 ---
 
+## Opt-in history
+
+Session state is in-memory by default and expires after one hour. When the
+upload form's **Save to history** toggle is on, the session is also written to
+the configured Postgres database (`HistorySession` table) and survives server
+restarts until the user deletes it. Rows are scoped to an anonymous httpOnly
+owner cookie — there are no accounts, and a different browser cannot read them.
+History is off by default and the database is optional; without `DATABASE_URL`
+the feature is hidden and nothing is persisted.
+
 ## Privacy
 
 Uploaded documents live only in server memory for up to 1 hour and are never
-written to disk. Sessions expire automatically and are evicted on the next
-request after their TTL. The humanizer sends the extracted text to the
-configured language-model provider (OpenRouter, OpenAI, or Z.ai) — do not
-upload text you cannot send to an LLM.
+written to disk, except for opt-in history rows (see above). Sessions expire
+automatically and are evicted on the next request after their TTL. The
+humanizer sends the extracted text to the configured language-model provider
+(OpenRouter, OpenAI, or Z.ai) — do not upload text you cannot send to an LLM.
 
 ---
 

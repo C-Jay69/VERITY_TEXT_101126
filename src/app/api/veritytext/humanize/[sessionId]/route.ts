@@ -18,6 +18,7 @@ import {
   type HumanizeOptions,
 } from "@/lib/veritytext/humanizer";
 import { analyzeText } from "@/lib/veritytext/detector";
+import { syncHistory } from "@/lib/veritytext/history";
 
 export const runtime = "nodejs";
 
@@ -143,7 +144,7 @@ export async function POST(
 
     const warning = buildWarning(originalScore, newScore, opts.strength, opts.reRun);
 
-    updateSession(sessionId, {
+    const updated = updateSession(sessionId, {
       humanizedText: result.text,
       humanizedReport,
       humanizeMeta: {
@@ -154,6 +155,7 @@ export async function POST(
         reHumanized: opts.reRun,
       },
     });
+    if (updated) await syncHistory(updated);
 
     return NextResponse.json({
       humanizedText: result.text,
@@ -226,7 +228,7 @@ function streamResponse({
             : buildWarning(originalScore, newScore, opts.strength, opts.reRun);
 
           if (!event.error) {
-            updateSession(sessionId, {
+            const updated = updateSession(sessionId, {
               humanizedText: event.text,
               humanizedReport,
               humanizeMeta: {
@@ -237,6 +239,7 @@ function streamResponse({
                 reHumanized: opts.reRun,
               },
             });
+            if (updated) await syncHistory(updated);
           }
 
           send({

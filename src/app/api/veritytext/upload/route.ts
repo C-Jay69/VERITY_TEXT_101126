@@ -4,8 +4,15 @@
 // creates a session, and returns { sessionId, meta, extractedLength, report }.
 import { NextRequest, NextResponse } from "next/server";
 import { validateFile, extractText, MAX_FILE_SIZE } from "@/lib/veritytext/parsing";
-import { createSession } from "@/lib/veritytext/session";
+import { createSession, updateSession } from "@/lib/veritytext/session";
 import { analyzeText } from "@/lib/veritytext/detector";
+import {
+  attachOwnerCookie,
+  getOwnerId,
+  historyConfigured,
+  newOwnerId,
+  saveHistory,
+} from "@/lib/veritytext/history";
 
 export const runtime = "nodejs";
 
@@ -84,7 +91,34 @@ export async function POST(req: NextRequest) {
       report,
     });
 
-    return NextResponse.json({
+    // Opt-in persistence. Nothing is written unless the client explicitly
+    // asks for it; a database failure must never fail the analysis.
+    const wantsHistory = formData.get("saveHistory") === "true";
+    let ownerId = getOwnerId(req);
+    let historySaved = false;
+    let historyError: string | undefined;
+    if (wantsHistory) {
+      if (!historyConfigured()) {
+        historyError =
+          "History is not configured on this server. Set DATABASE_URL to a Postgres database to enable it.";
+      } else {
+        ownerId = ownerId ?? newOwnerId();
+        try {
+          await saveHistory(session, ownerId);
+          updateSession(session.id, {
+            historySaved: true,
+            historyOwnerId: ownerId,
+          });
+          historySaved = true;
+        } catch (err) {
+          console.error("[veritytext] save history failed:", err);
+          historyError =
+            "The analysis succeeded, but it could not be saved to history.";
+        }
+      }
+    }
+
+    const response = NextResponse.json({
       sessionId: session.id,
       meta: {
         filename: session.filename,
@@ -97,7 +131,12 @@ export async function POST(req: NextRequest) {
       },
       extractedLength: extracted.text.length,
       report,
+      historySaved,
+      historyError,
     });
+
+    if (historySaved && ownerId) attachOwnerCookie(response, ownerId);
+    return response;
   } catch (err) {
     console.error("[veritytext] upload route failed:", err);
     const msg = err instanceof Error ? err.message : "Upload failed.";

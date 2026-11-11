@@ -210,7 +210,10 @@ export function AboutDialog() {
               <h3 className="font-serif text-base font-semibold text-stone-900">Privacy</h3>
               <p className="mt-1">
                 Uploaded documents live only in server memory for up to 1 hour and are never written
-                to disk. Sessions expire automatically. The humanizer sends the extracted text to the
+                to disk — unless you explicitly turn on <strong>Save to history</strong> before
+                uploading. In that case the text and its reports are stored in the configured
+                Postgres database, scoped to an anonymous cookie, and remain until you delete the
+                entry. History is off by default. The humanizer sends the extracted text to the
                 configured language-model provider (OpenRouter, OpenAI, or Z.ai) — do not upload text
                 you cannot send to an LLM.
               </p>

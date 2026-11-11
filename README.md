@@ -32,13 +32,14 @@ npx tsc --noEmit
 npm run lint
 ```
 
-No database migration is required — all session state is in-memory.
+No database is required for detection — sessions are in-memory. Only the
+opt-in history feature needs a Postgres database (see below).
 
 ### Environment variables
 
 Detection needs **no configuration at all**. The only optional configuration is
-the humanizer's LLM backend and the optional Prisma history store (SQLite or
-Postgres). Copy `.env.example` to `.env` if you want to configure them.
+the humanizer's LLM backend and the opt-in history store (Postgres). Copy
+`.env.example` to `.env` if you want to configure them.
 
 The humanizer supports any of these, checked in order:
 
@@ -58,6 +59,22 @@ Each provider is resolved as a whole (base URL, key, and model together), so a
 key is never paired with another provider's endpoint. If none is configured,
 the humanizer degrades gracefully: it returns the original text with a visible
 error banner, and detection still works normally.
+
+### Opt-in history (Postgres)
+
+Sessions are in-memory by default. If you set `DATABASE_URL` to a Postgres
+database (Supabase works) and run the schema push once, uploads can opt in to
+being saved:
+
+```bash
+npx prisma db push     # creates the HistorySession table
+```
+
+Nothing is written unless the user ticks **Save to history** before uploading.
+Rows are scoped to an anonymous httpOnly cookie, so one browser cannot read
+another's history. Entries can be reopened (restoring the report, humanized
+text, and downloads) or deleted from the upload view. Without `DATABASE_URL`,
+history is hidden and the app behaves exactly as before.
 
 ---
 
@@ -155,21 +172,27 @@ All routes are relative (e.g. `POST /api/veritytext/upload`).
 
 | Method | Route | Body / Query | Returns |
 |--------|-------|--------------|---------|
-| `POST` | `/api/veritytext/upload` | multipart `file` | `{ sessionId, meta, report }` |
+| `POST` | `/api/veritytext/upload` | multipart `file`, optional `saveHistory=true` | `{ sessionId, meta, report, historySaved?, historyError? }` |
 | `GET`  | `/api/veritytext/report/[sessionId]` | — | `{ sessionId, meta, report, humanized }` |
 | `POST` | `/api/veritytext/humanize/[sessionId]` | `{ strength, tone, preserve, reRun?, stream? }` | JSON, or `text/event-stream` when `stream: true` |
 | `GET`  | `/api/veritytext/download/[sessionId]` | `?format=pdf\|json\|docx\|txt\|original&variant=original\|humanized` | binary file |
 | `GET`  | `/api/veritytext/sample/[name]` | `name = ai_sample \| human_sample \| hybrid_sample` | `{ sessionId, meta, report }` |
+| `GET`  | `/api/veritytext/history` | owner cookie | `{ enabled, items[], reason? }` |
+| `POST` | `/api/veritytext/history/[id]/restore` | owner cookie | `{ sessionId, meta, report, humanized }` |
+| `DELETE` | `/api/veritytext/history/[id]` | owner cookie | `{ deleted: true }` |
 
 Sessions live in server memory for up to 1 hour and are never written to disk.
+The only exception is an opt-in history row, which persists in Postgres until
+the user deletes it.
 
 ---
 
 ## The humanizer
 
-The humanizer calls a configured LLM server-side — either an OpenAI-compatible
-endpoint (environment variables) or `z-ai-web-dev-sdk` (`.z-ai-config`) — with a
-tightly engineered system prompt that inverts each detected signal. It always
+The humanizer calls a configured LLM server-side — an OpenAI-compatible
+endpoint (LLM_*, OpenRouter, or OpenAI environment variables) or
+`z-ai-web-dev-sdk` (`.z-ai-config`) — with a tightly engineered system prompt
+that inverts each detected signal. It always
 preserves all facts, citations, names, dates, numbers, and quotes. Output is
 streamed token-by-token (Server-Sent Events) and is re-scored automatically so
 you can see the improvement. Long-running rewrites are cancellable.
@@ -204,7 +227,12 @@ src/
 │   │   ├── report/[sessionId]/route.ts
 │   │   ├── humanize/[sessionId]/route.ts
 │   │   ├── download/[sessionId]/route.ts
-│   │   └── sample/[name]/route.ts
+│   │   ├── sample/[name]/route.ts
+│   │   └── history/
+│   │       ├── route.ts
+│   │       └── [id]/
+│   │           ├── route.ts
+│   │           └── restore/route.ts
 │   ├── globals.css
 │   ├── layout.tsx
 │   └── page.tsx
@@ -227,12 +255,16 @@ src/
     │   ├── text-utils.ts
     │   ├── types.ts
     │   └── weights.ts
+    ├── history.ts
     ├── humanizer.ts
     ├── llm.ts
     ├── parsing.ts
     ├── report.ts
     ├── session.ts
     └── store.ts
+
+prisma/
+└── schema.prisma
 
 samples/
 ├── ai_sample.txt
@@ -264,6 +296,11 @@ README.md
 - **Single-process state.** The session store is in-process memory; if the dev
   server restarts, sessions are lost. This is intentional for v1 (no document
   persistence beyond the TTL).
+- **History is browser-scoped.** Opt-in history rows are keyed to an anonymous
+  httpOnly cookie, not an account. Clearing cookies or switching browsers loses
+  access to those rows (though they remain in the database until deleted).
+- **Postgres only.** The checked-in Prisma schema uses the `postgresql`
+  provider. SQLite URLs are not supported for the history feature.
 
 ---
 

@@ -1,32 +1,44 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// VerityText optional history store.
+//
+// Sessions are in-memory by default. A document is written here only when the
+// user explicitly enables "Save to history" before uploading. Rows are scoped
+// to an anonymous, httpOnly owner cookie so one browser cannot read another's
+// history. Deleting a row (or clearing cookies) removes access immediately.
+//
+// This feature requires a Postgres database (Supabase works). Set DATABASE_URL
+// and run `npx prisma db push`. Without DATABASE_URL, the app runs normally and
+// the history endpoints report that history is not configured.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
+model HistorySession {
+  id                  String   @id
+  ownerId             String
+  filename            String
+  fileType            String
+  fileSize            Int
+  extractedLength     Int
+  wordCount           Int
+  originalText        String
+  humanizedText       String?
+  aiProbability       Int
+  verdict             String
+  band                String
+  confidence          Int
+  reportJson          String
+  humanizedReportJson String?
+  humanizeMetaJson    String?
+  hasHumanized        Boolean  @default(false)
+  humanizedScore      Int?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-model Post {
-  id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  @@index([ownerId, updatedAt])
 }

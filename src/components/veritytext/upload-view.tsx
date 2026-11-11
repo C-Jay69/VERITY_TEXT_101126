@@ -1,13 +1,25 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useVerityStore, type SessionMeta } from "@/lib/veritytext/store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, UploadCloud, X, Loader2, FileWarning, FlaskConical } from "lucide-react";
+import {
+  FileText,
+  UploadCloud,
+  X,
+  Loader2,
+  FileWarning,
+  FlaskConical,
+  History,
+  FolderOpen,
+  Trash2,
+  RefreshCw,
+} from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { DetectionReport } from "@/lib/veritytext/detector/types";
 
@@ -27,6 +39,41 @@ interface UploadResponse {
   };
   report: DetectionReport;
   extractedLength?: number;
+  historySaved?: boolean;
+  historyError?: string;
+}
+
+interface HistoryItem {
+  id: string;
+  filename: string;
+  fileType: string;
+  aiProbability: number;
+  verdict: string;
+  band: string;
+  confidence: number;
+  hasHumanized: boolean;
+  humanizedScore: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface RestoreResponse {
+  sessionId: string;
+  meta: {
+    filename: string;
+    fileType: string;
+    fileSize: number;
+    extractedLength: number;
+    wordCount: number;
+    partialAnalysis: boolean;
+    warnings: string[];
+  };
+  report: DetectionReport;
+  humanized: {
+    text: string;
+    report: DetectionReport | null;
+    meta: { warning?: string } | null;
+  } | null;
 }
 
 export function UploadView() {
@@ -35,9 +82,15 @@ export function UploadView() {
   const [uploading, setUploading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [cancelController, setCancelController] = useState<AbortController | null>(null);
+  const [saveHistory, setSaveHistory] = useState(false);
+  const [historyEnabled, setHistoryEnabled] = useState(false);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [historyNotice, setHistoryNotice] = useState<string | null>(null);
+  const [historyBusyId, setHistoryBusyId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const setSession = useVerityStore((s) => s.setSession);
+  const setHumanize = useVerityStore((s) => s.setHumanize);
   const setError = useVerityStore((s) => s.setError);
   const error = useVerityStore((s) => s.error);
   const recents = useVerityStore((s) => s.recents);
@@ -61,10 +114,100 @@ export function UploadView() {
     [],
   );
 
+  const loadHistory = useCallback(async () => {
+    try {
+      const res = await fetch("/api/veritytext/history", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        enabled: boolean;
+        items: HistoryItem[];
+        reason?: string;
+      };
+      setHistoryEnabled(data.enabled);
+      setHistoryItems(data.items ?? []);
+      if (!data.enabled && data.reason) setHistoryNotice(data.reason);
+    } catch {
+      // History is optional — never block uploads on it.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
+
+  const openHistoryItem = useCallback(
+    async (id: string) => {
+      setHistoryBusyId(id);
+      setHistoryNotice(null);
+      try {
+        const res = await fetch(`/api/veritytext/history/${id}/restore`, {
+          method: "POST",
+        });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string };
+          setHistoryNotice(j.error ?? "Could not open this history entry.");
+          return;
+        }
+        const data = (await res.json()) as RestoreResponse;
+        const meta: SessionMeta = {
+          sessionId: data.sessionId,
+          filename: data.meta.filename,
+          fileType: data.meta.fileType,
+          fileSize: data.meta.fileSize,
+          wordCount: data.meta.wordCount,
+          extractedLength: data.meta.extractedLength ?? data.meta.fileSize,
+          partialAnalysis: data.meta.partialAnalysis,
+          warnings: data.meta.warnings ?? [],
+        };
+        setSession(meta.sessionId, meta, data.report);
+        if (data.humanized?.text && data.humanized.report) {
+          setHumanize({
+            text: data.humanized.text,
+            report: data.humanized.report,
+            originalScore: data.report.aggregate.aiProbability,
+            newScore: data.humanized.report.aggregate.aiProbability,
+            warning: data.humanized.meta?.warning ?? null,
+          });
+        }
+      } catch (e) {
+        setHistoryNotice(
+          e instanceof Error ? e.message : "Could not open this history entry.",
+        );
+      } finally {
+        setHistoryBusyId(null);
+      }
+    },
+    [setSession, setHumanize],
+  );
+
+  const deleteHistoryItem = useCallback(async (id: string) => {
+    if (!window.confirm("Delete this saved session permanently?")) return;
+    setHistoryBusyId(id);
+    setHistoryNotice(null);
+    try {
+      const res = await fetch(`/api/veritytext/history/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        setHistoryNotice(j.error ?? "Could not delete this history entry.");
+        return;
+      }
+      setHistoryItems((items) => items.filter((item) => item.id !== id));
+    } catch (e) {
+      setHistoryNotice(
+        e instanceof Error ? e.message : "Could not delete this history entry.",
+      );
+    } finally {
+      setHistoryBusyId(null);
+    }
+  }, []);
+
   const upload = useCallback(
     async (file: File) => {
       setLocalError(null);
       setError(null);
+      setHistoryNotice(null);
       const err = validateClient(file);
       if (err) {
         setLocalError(err);
@@ -77,6 +220,7 @@ export function UploadView() {
       try {
         const formData = new FormData();
         formData.append("file", file);
+        formData.append("saveHistory", saveHistory ? "true" : "false");
         // Simulate incremental progress for UX — the upload itself is one request.
         const progressTimer = setInterval(() => {
           setProgress((p) => (p < 85 ? p + Math.random() * 8 : p));
@@ -113,6 +257,8 @@ export function UploadView() {
           warnings: data.meta.warnings ?? [],
         };
         setSession(meta.sessionId, meta, data.report);
+        if (data.historyError) setHistoryNotice(data.historyError);
+        if (data.historySaved) void loadHistory();
       } catch (e) {
         if ((e as Error).name === "AbortError") {
           setLocalError("Upload cancelled.");
@@ -126,7 +272,7 @@ export function UploadView() {
         setTimeout(() => setProgress(0), 800);
       }
     },
-    [setSession, setError, validateClient],
+    [setSession, setError, validateClient, saveHistory, loadHistory],
   );
 
   const onDrop = useCallback(
@@ -281,6 +427,26 @@ export function UploadView() {
             />
           </div>
 
+          <div className="mt-4 flex items-start gap-2 rounded-md border border-stone-200 bg-stone-50/60 p-3 text-xs text-stone-600">
+            <Checkbox
+              id="save-history"
+              checked={saveHistory}
+              onCheckedChange={(checked) => setSaveHistory(checked === true)}
+              disabled={uploading}
+              aria-label="Save to history"
+              className="mt-0.5"
+            />
+            <label htmlFor="save-history" className="cursor-pointer">
+              <span className="font-medium text-stone-800">
+                Save to history (opt-in)
+              </span>
+              <span className="mt-0.5 block">
+                Stores this document, its report, and any humanized version in the
+                configured Postgres database. Off by default; delete entries at any time.
+              </span>
+            </label>
+          </div>
+
           {uploading && (
             <div className="mt-4 space-y-2">
               <Progress value={progress} className="h-2 bg-stone-200" />
@@ -322,10 +488,94 @@ export function UploadView() {
         </div>
       </div>
 
+      {(historyEnabled || historyItems.length > 0 || historyNotice) && (
+        <div className="mt-8">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="text-xs font-medium uppercase tracking-wide text-stone-500">
+              Saved history (opt-in)
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs text-stone-600"
+              onClick={() => void loadHistory()}
+            >
+              <RefreshCw className="size-3" /> Refresh
+            </Button>
+          </div>
+
+          {historyNotice && (
+            <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              {historyNotice}
+            </div>
+          )}
+
+          {historyItems.length === 0 ? (
+            <p className="rounded-lg border border-stone-200 bg-white px-3 py-3 text-xs text-stone-500">
+              No saved entries yet. Turn on “Save to history” before uploading to keep a
+              document, its report, and any humanized version here.
+            </p>
+          ) : (
+            <ScrollArea className="max-h-56 rounded-lg border border-stone-200 bg-white">
+              <ul className="divide-y divide-stone-100">
+                {historyItems.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <History className="size-4 shrink-0 text-stone-400" />
+                        <span className="truncate font-medium text-stone-800">
+                          {item.filename}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-xs text-stone-500">
+                        {new Date(item.createdAt).toLocaleString()} · {item.verdict}{" "}
+                        {item.aiProbability}%
+                        {item.hasHumanized && item.humanizedScore != null
+                          ? ` · humanized ${item.humanizedScore}%`
+                          : ""}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        disabled={historyBusyId === item.id}
+                        onClick={() => void openHistoryItem(item.id)}
+                      >
+                        {historyBusyId === item.id ? (
+                          <Loader2 className="size-3 animate-spin" />
+                        ) : (
+                          <FolderOpen className="size-3" />
+                        )}
+                        Open
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-stone-500"
+                        disabled={historyBusyId === item.id}
+                        aria-label={`Delete ${item.filename}`}
+                        onClick={() => void deleteHistoryItem(item.id)}
+                      >
+                        <Trash2 className="size-3" />
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </ScrollArea>
+          )}
+        </div>
+      )}
+
       {recents.length > 0 && (
         <div className="mt-8">
           <div className="mb-2 text-xs font-medium uppercase tracking-wide text-stone-500">
-            Recent uploads (this browser session)
+            Recent uploads (this browser tab)
           </div>
           <ScrollArea className="max-h-40 rounded-lg border border-stone-200 bg-white">
             <ul className="divide-y divide-stone-100">
