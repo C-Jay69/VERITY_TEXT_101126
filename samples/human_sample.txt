@@ -1,0 +1,27 @@
+Why I Stopped Trusting Productivity Apps
+
+I downloaded my first to-do app in 2009. Remember Astrid? Probably not. It got acquired and killed, like everything else from that era. I kept jumping ship — Wunderlist, then Things, then a year where I tried to go paper-only, then back to apps. Here's what I learned after fifteen years of this nonsense.
+
+Most productivity apps are designed to make you feel productive, not to make you productive. That's a harsh claim, so let me back it up.
+
+On March 14, 2023, I ran an experiment. I tracked every task I completed in Notion for thirty days. At the end of the month I had 247 "completed" items. Sounds great, right? But when I sat down with my cofounder Lila on April 2nd and we went through them, only 38 had actually moved anything forward. The other 209 were things like "reply to Marcus about the invoice" or "update the Q1 doc" — busywork I'd retroactively turned into a checkbox so I could check it off.
+
+The apps were training me.
+
+Worse, they were training me in a specific way: to confuse motion with progress. I'd spend twenty minutes reorganizing my "Today" view, color-coding tags, and feel like I'd done real work. I hadn't. I'd just rearranged the furniture on a sinking ship.
+
+So in May 2023 I tried something. I went back to a single text file. Open `notes.txt`, write down the three things I actually needed to finish that day, close the file. That was it. No tags, no projects, no recurring tasks, no integration with Slack or Gmail or my calendar.
+
+The first week was awful. I kept opening the old app out of habit, the way you reach for a phone that isn't there. By week two I noticed something: I was finishing the three things. Not all of them, every day — but most of them, most days. And the things I was finishing were the right things, because I'd had to actually think about which three mattered instead of dumping forty items into a list and calling it planning.
+
+Lila thought I was being stubborn. "You're just trading one system for a worse one," she said over coffee at Sightglass, the Tuesday after Memorial Day. Maybe. But the worse system was working.
+
+There's research that backs this up, sort of. Baumeister and Tierney's book on willpower (the 2011 one, not the later paperback with the new foreword) spends a whole chapter on decision fatigue, and a lot of what they describe matches what I felt: every extra field in a task manager is a micro-decision, and micro-decisions add up. I'm not claiming the text file is science. I'm claiming it removed about forty micro-decisions from my morning.
+
+A few months in, I noticed the anxiety had quietly left. I wasn't checking the app on the train. I wasn't doing the 11pm "let me just clear out today's list" ritual. I'd write three things in the morning, do them (or not), and close the laptop.
+
+Here's the part I can't quite explain: my output went up. Not marginally. My cofounder and I shipped the v2 API rewrite three weeks ahead of the deadline we'd set in February. I started writing on the company blog again, after almost a year of nothing. I read four novels in October, which is more than I'd read in the previous two years combined. None of that was on any list.
+
+I'm not telling you to delete your to-do app. If Things or Todoist or whatever is working for you, genuinely working, then keep it. But if you've been using one for years and you still feel behind, try this: one file, three lines, no metadata. Give it two weeks. The withdrawal is real. What comes after, for me at least, was worth it.
+
+(And no, I'm not making a productivity app. Don't @ me.)
